@@ -1,0 +1,44 @@
+FROM devops-ccp.arpatech.com/test1/php-composer:alpha-7.2-alpine-bash
+MAINTAINER Haider Jafri <haider.jafri@arpatech.com>
+
+ARG VCS_REF
+ARG BUILD_DATE
+ARG PROJECT=laravel-app
+ARG DOCKERFILE_DIR=docker/
+
+
+USER root
+
+RUN rm -rf /var/www/* && mkdir -p /var/www/${PROJECT}
+
+COPY composer.json /var/www/${PROJECT}
+
+RUN chown -R www-data:www-data /var/www && usermod -u 1000 www-data
+
+WORKDIR /var/www/${PROJECT}
+
+RUN composer install --no-scripts --no-autoloader
+
+COPY ./ /var/www/${PROJECT}
+
+RUN composer dump-autoload --optimize;
+
+COPY ${DOCKERFILE_DIR}/entrypoint.sh entrypoint.sh
+
+RUN chmod +x entrypoint.sh
+
+RUN mkdir -p /var/www/${PROJECT}/storage/logs && \
+    touch /var/www/${PROJECT}/storage/logs/laravel.log && \
+    chown www-data:www-data /var/www/${PROJECT}/storage/logs/laravel.log
+
+RUN mkdir -p /var/www/${PROJECT}/storage && \
+    chown -R www-data:www-data /var/www/${PROJECT}/storage && \
+    mkdir -p /var/www/${PROJECT}/public/exports && \
+    chown -R www-data:www-data /var/www/${PROJECT}/public/exports/ && \
+    mkdir -p /var/www/${PROJECT}/public/eula && \
+    chown -R www-data:www-data /var/www/${PROJECT}/public/eula/
+EXPOSE 9000
+
+ENTRYPOINT ["./entrypoint.sh"]
+
+CMD ["php-fpm"]

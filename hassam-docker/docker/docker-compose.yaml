@@ -1,0 +1,21 @@
+version: '2'
+services:
+  web:
+    image: hassam-hub/php-nginx:latest
+    container_name: laravel-nginx
+    volumes_from:
+      - api
+    working_dir: /var/www
+    ports:
+      - 80:80
+  php:
+    image: hassam-hub/php-live:latest
+    container_name: laravel-php
+    volumes:
+      - ./api:/var/www
+    working_dir: /var/www
+
+networks:
+  default:
+    external:
+      name: nginx-proxy
