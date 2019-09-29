@@ -8,3 +8,4 @@ cd hassam-docker
 docker run --rm -w /app -v $(pwd):/app composer install
 cp .env.example .env
 docker exec laravel-php php artisan key:generate
+docker exec laravel-php php artisan migrate
