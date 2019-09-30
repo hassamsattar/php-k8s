@@ -27,7 +27,8 @@ RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p /var/www/${PROJECT}/storage/logs && \
     touch /var/www/${PROJECT}/storage/logs/laravel.log && \
-    chown www-data:www-data /var/www/${PROJECT}/storage/logs/laravel.log
+    chown www-data:www-data /var/www/${PROJECT}/storage/logs/laravel.log && \
+    chown www-data:www-data /var/www/${PROJECT}/storage/
 
 RUN mkdir -p /var/www/${PROJECT}/storage && \
     chown -R www-data:www-data /var/www/${PROJECT}/storage && \
