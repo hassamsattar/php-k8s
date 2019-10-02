@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+  name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-supervisord
+  defaultMode: 0777
+  labels:
+    app: {{ template "laravel5.name" . }}
+    chart: {{ template "laravel5.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  supervisord.conf: |-
+{{ .Files.Get "conf/supervisord.conf" | indent 4 }}
+  kill_supervisor.py: |-
+{{ .Files.Get "conf/kill_supervisor.py" | indent 4 }}

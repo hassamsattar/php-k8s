@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "laravel5.fullname" . }}-nginx
+  labels:
+    app: {{ template "laravel5.name" . }}
+    chart: {{ template "laravel5.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: {{ .Values.nginxService.type }}
+  sessionAffinity: ClientIP
+  ports:
+    - port: {{ .Values.nginxService.externalPort }}
+      targetPort: {{ .Values.nginxService.internalPort }}
+      protocol: TCP
+      name: http
+  selector:
+    run: my-nginx

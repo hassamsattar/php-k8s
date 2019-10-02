@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: v1.HS.10.22
+description: Helm chart for HS-TEST  with Supervisord and Cronjobs
+name: laravel-app
+version: release

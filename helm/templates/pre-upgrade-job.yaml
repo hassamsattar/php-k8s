@@ -1,0 +1,103 @@
+{{- if .Values.preUpgradeJob -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ template "laravel5.fullname" . }}-pre-upgrade-job-{{ .Release.Time.Seconds }}"
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded
+  labels:
+    app: {{ template "laravel5.name" . }}-nginx
+    chart: {{ template "laravel5.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 100
+  ttlSecondsAfterFinished: 10
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: oauth-keys
+          configMap:
+            name: generate-oauth
+        - name: upgrade-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds}}-execute
+            items:
+            - key: upgrade.sh
+              path: upgrade.sh
+        - name: project-env
+          secret:
+            secretName: project-env
+        - name: serviceaccount
+          secret:
+            secretName: api-service-account-token-4gnvq
+        - name: install-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds}}-install
+            items:
+            - key: install.sh
+              path: install.sh
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        - name: {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-phpfpm
+          image: "{{ .Values.phpfpmImage.repository }}:{{ .Values.phpfpmImage.tag }}"
+          imagePullPolicy: {{ .Values.phpfpmImage.pullPolicy }}
+          args: ["{{ .Values.preUpgradeCommand.arg1 }}",
+                "{{ .Values.preUpgradeCommand.arg3 }}",
+                "{{ .Values.preUpgradeCommand.arg4 }}"]
+          ports:
+            - name: phpfpm
+              containerPort: {{ .Values.phpfpmPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: project-env
+              mountPath: /var/www/laravel-app/.env
+              subPath: .env
+            - name: upgrade-script
+              mountPath: /var/www/laravel-app/upgrade.sh
+              subPath: upgrade.sh
+            - name: install-script
+              mountPath: /var/www/laravel-app/install.sh
+              subPath: install.sh
+            - name: oauth-keys
+              mountPath: /etc/oauth-keys
+            - name: serviceaccount
+              mountPath: /var/www/laravel-app/token
+              subPath: token
+            - name: serviceaccount
+              mountPath: /var/www/laravel-app/ca.crt
+              subPath: ca.crt
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.phpfpmPort }}
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.phpfpmPort }}
+            initialDelaySeconds: 40
+            timeoutSeconds: 5
+          resources:
+    {{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+    {{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+    {{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+    {{ toYaml . | indent 8 }}
+    {{- end }}
+
+
+{{- end -}}

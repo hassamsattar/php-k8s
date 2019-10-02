@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "laravel5.fullname" . }}-supervisord
+  labels:
+    app: {{ template "laravel5.name" . }}
+    chart: {{ template "laravel5.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: {{ template "laravel5.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configMaps/configmap-nginx.yaml") . | sha256sum }}
+      labels:
+        app: {{ template "laravel5.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: supervisor-config
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-supervisord
+            items:
+            - key: supervisord.conf
+              path: supervisord.conf
+        - name: kill-supervisor
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-supervisord
+            items:
+            - key: kill_supervisor.py
+              path: kill_supervisor.py
+        - name: config-volume
+          configMap:
+            name: oauthkeys
+        - name: laravel-conf
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-nginx
+            items:
+            - key: laravel-site.conf
+              path: laravel-site.conf
+
+        - name: phpini-conf
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-phpini
+            items:
+            - key: custom-php.ini
+              path: custom-php.ini
+        - name: php-fpm
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-phpfpm
+            items:
+            - key: www.conf
+              path: www.conf
+        - name: upgrade-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-execute
+            items:
+            - key: upgrade.sh
+              path: upgrade.sh
+        - name: install-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-install
+            items:
+            - key: install.sh
+              path: install.sh
+        - name: project-env
+          secret:
+            secretName: project-env
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        - name: {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-phpfpm
+          image: "{{ .Values.phpfpmImage.repository }}:{{ .Values.phpfpmImage.tag }}"
+          imagePullPolicy: {{ .Values.phpfpmImage.pullPolicy }}
+#          command: ["supervisord -c /etc/supervisord.conf"]
+          command: ["supervisord"]
+          ports:
+            - name: phpfpm
+              containerPort: {{ .Values.phpfpmPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: supervisor-config
+              mountPath: /etc/supervisord.conf
+              subPath: supervisord.conf
+            - name: kill-supervisor
+              mountPath: /usr/bin/kill_supervisor.py
+              subPath: kill_supervisor.py
+            - name: phpini-conf
+              mountPath: /usr/local/etc/php/conf.d/custom-php.ini
+              subPath: custom-php.ini
+            - name: php-fpm
+              mountPath: /usr/local/etc/php-fpm.d/www.conf
+              subPath: www.conf
+            - name: project-env
+              mountPath: /var/www/laravel-app/.env
+              subPath: .env
+            - name: upgrade-script
+              mountPath: /var/www/laravel-app/upgrade.sh
+              subPath: upgrade.sh
+            - name: install-script
+              mountPath: /var/www/laravel-app/install.sh
+              subPath: install.sh
+            - name: config-volume
+              mountPath: /var/www/laravel-app/storage/oauth-public.key
+              subPath: oauth-public.key
+            - name: config-volume
+              mountPath: /var/www/laravel-app/storage/oauth-private.key
+              subPath: oauth-private.key
+          resources:
+{{ toYaml .Values.phpfpmResources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

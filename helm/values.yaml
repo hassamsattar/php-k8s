@@ -1,0 +1,59 @@
+replicaCount: 1
+#imagePullSecrets: on-prem-dockersecret
+enableSupervisord: true
+enableCrond: true
+preInstallJob: true
+preInstallCommand:
+  arg1: "install.sh"
+preUpgradeJob: true
+preUpgradeCommand:
+  arg1: "upgrade.sh"
+nginxImage:
+  repository: hassam1989/php-nginx
+  tag: v15.2-CommunicationEmail-AddSubscription
+  pullPolicy: Always
+nginxLivenessProbe:
+  initialDelaySeconds: 60
+  timeoutSeconds: 5
+nginxReadinessProbe:
+  initialDelaySeconds: 60
+  timeoutSeconds: 5
+phpfpmImage:
+  repository: hassam1989/php-live
+  tag:  v15.2-CommunicationEmail-AddSubscription
+  pullPolicy: Always
+phpfpmLivenessProbe:
+  initialDelaySeconds: 40
+  timeoutSeconds: 5
+phpfpmReadinessProbe:
+  initialDelaySeconds: 60
+  timeoutSeconds: 5
+nginxService:
+  type: ClusterIP
+  externalPort: 80
+  internalPort: 80
+phpfpmPort: 9000
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+#    nginx.ingress.kubernetes.io/affinity: "cookie"
+#    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+#    nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+#    nginx.ingress.kubernetes.io/session-cookie-change-on-failure: "true"
+  path: /
+  hosts:
+    - hassam.test.com
+  tls:
+    - secretName: hassam
+      hosts:
+        - hassam.test.com
+nginxResources: {}
+phpfpmResources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

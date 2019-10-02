@@ -1,0 +1,159 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "laravel5.fullname" . }}
+  labels:
+    app: {{ template "laravel5.name" . }}
+    chart: {{ template "laravel5.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+    nginx: "true"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "laravel5.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configMaps/configmap-nginx.yaml") . | sha256sum }}
+      labels:
+        app: {{ template "laravel5.name" . }}
+        release: {{ .Release.Name }}
+        run: my-nginx
+    spec:
+      volumes:
+        - name: config-volume
+          configMap:
+            name: oauthkeys
+        - name: nginx-conf
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-nginx
+            items:
+            - key: nginx.conf
+              path: nginx.conf
+        - name: laravel-conf
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-nginx
+            items:
+            - key: laravel-site.conf
+              path: laravel-site.conf
+
+        - name: phpini-conf
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-phpini
+            items:
+            - key: custom-php.ini
+              path: custom-php.ini
+        - name: php-fpm
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds }}-phpfpm
+            items:
+            - key: www.conf
+              path: www.conf
+        - name: upgrade-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds}}-execute
+            items:
+            - key: upgrade.sh
+              path: upgrade.sh
+        - name: install-script
+          configMap:
+            name: {{ template "laravel5.fullname" . }}-{{ .Release.Time.Seconds}}-install
+            items:
+            - key: install.sh
+              path: install.sh
+        - name: project-env
+          secret:
+            secretName: project-env
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        - name: {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}-nginx
+          image: "{{ .Values.nginxImage.repository }}:{{ .Values.nginxImage.tag }}"
+          imagePullPolicy: {{ .Values.nginxImage.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.nginxService.internalPort }}
+            - name: https
+              containerPort: 443
+          volumeMounts:
+#            - name: phpini-conf
+#              mountPath: /usr/local/etc/php/conf.d/custom-php.ini
+#              subPath: custom-php.ini
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: laravel-conf
+              mountPath: /etc/nginx/sites-available/
+
+#          livenessProbe:
+#            httpGet:
+#              path: /
+#              port: http
+#            initialDelaySeconds: {{ .Values.nginxLivenessProbe.initialDelaySeconds }}
+#            timeoutSeconds: {{ .Values.nginxLivenessProbe.timeoutSeconds }}
+#          readinessProbe:
+#            httpGet:
+#              path: /
+#              port: http
+#            initialDelaySeconds: {{ .Values.nginxReadinessProbe.initialDelaySeconds }}
+#            timeoutSeconds: {{ .Values.nginxReadinessProbe.timeoutSeconds }}
+          resources:
+{{ toYaml .Values.nginxResources | indent 12 }}
+        - name: {{ .Chart.Name }}-phpfpm
+          image: "{{ .Values.phpfpmImage.repository }}:{{ .Values.phpfpmImage.tag }}"
+          imagePullPolicy: {{ .Values.phpfpmImage.pullPolicy }}
+          ports:
+            - name: phpfpm
+              containerPort: {{ .Values.phpfpmPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: phpini-conf
+              mountPath: /usr/local/etc/php/conf.d/custom-php.ini
+              subPath: custom-php.ini
+            - name: php-fpm
+              mountPath: /usr/local/etc/php-fpm.d/www.conf
+              subPath: www.conf
+            - name: project-env
+              mountPath: /var/www/laravel-app/.env
+              subPath: .env
+            - name: upgrade-script
+              mountPath: /var/www/laravel-app/upgrade.sh
+              subPath: upgrade.sh
+            - name: install-script
+              mountPath: /var/www/laravel-app/install.sh
+              subPath: install.sh
+            - name: config-volume
+              mountPath: /var/www/laravel-app/storage/oauth-public.key
+              subPath: oauth-public.key
+            - name: config-volume
+              mountPath: /var/www/laravel-app/storage/oauth-private.key
+              subPath: oauth-private.key
+#          livenessProbe:
+#            tcpSocket:
+#              port: {{ .Values.phpfpmPort }}
+#            initialDelaySeconds: {{ .Values.phpfpmLivenessProbe.initialDelaySeconds }}
+#            timeoutSeconds: {{ .Values.phpfpmLivenessProbe.timeoutSeconds }}
+#          readinessProbe:
+#            tcpSocket:
+#              port: {{ .Values.phpfpmPort }}
+#            initialDelaySeconds: {{ .Values.phpfpmReadinessProbe.initialDelaySeconds }}
+#            timeoutSeconds: {{ .Values.phpfpmReadinessProbe.timeoutSeconds }}
+          resources:
+{{ toYaml .Values.phpfpmResources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
