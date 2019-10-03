@@ -17,5 +17,7 @@ else
 
     tail -f /var/www/${PROJECT}/storage/logs/laravel.log &
 
-    exec "$@";
+    for k in $@; do
+        $k;
+    done
 fi
